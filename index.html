@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alerta Patrón — Radar Global</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0891b2">
+  <style>
+    #map { height: 450px; z-index: 1; }
+    .alerta-card { transition: all 0.3s ease; cursor: pointer; }
+    .alerta-card:hover { transform: translateY(-2px); border-color: #22d3ee; }
+  </style>
+</head>
+<body class="bg-gray-900 text-gray-100 min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <header class="bg-gray-800 py-4 px-6 border-b border-gray-700 shadow-md flex justify-between items-center sticky top-0 z-50">
+    <div>
+      <h1 class="text-2xl font-bold text-cyan-400"><i class="fa-solid fa-shield-halved mr-2"></i>Alerta Patrón</h1>
+      <p class="text-gray-400 text-xs mt-1">Radar Global contra la Manipulación de Bots</p>
+    </div>
+    <div class="flex items-center gap-4">
+      <button onclick="abrirGuia()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-md transition flex items-center">
+        <i class="fa-solid fa-book-open mr-1.5"></i> Aprende a Detectar
+      </button>
+      
+      <!-- Botón de Iniciar Sesión (Simulado) -->
+      <button id="btnLogin" onclick="simularLogin()" class="bg-gray-700 hover:bg-gray-600 border border-gray-600 text-white text-xs px-3 py-1.5 rounded-lg font-bold shadow-md transition flex items-center">
+        <i class="fa-brands fa-google mr-1.5"></i> Iniciar Sesión
+      </button>
+
+      <!-- Selector de Alcance -->
+      <div class="hidden sm:flex items-center gap-2 ml-2">
+        <label class="text-sm text-gray-400"><i class="fa-solid fa-earth-americas mr-1"></i> Alcance:</label>
+        <select id="filtroAlcance" class="bg-gray-700 text-sm rounded px-3 py-1.5 text-white border border-gray-600 focus:border-cyan-500 focus:outline-none cursor-pointer">
+          <option value="zona">📍 Mi Zona (5km)</option>
+          <option value="departamento">🏢 Mi Departamento / Estado</option>
+          <option value="pais">🇧🇴 Mi País</option>
+          <option value="continente">🌎 Mi Continente</option>
+          <option value="mundo" selected>🌍 Todo el Mundo</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex-grow container mx-auto px-4 py-6 max-w-7xl grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Columna Izquierda: Mapa y Radar -->
+    <div class="lg:col-span-2 space-y-6">
+      
+      <!-- Selector Móvil (Visible solo en pantallas pequeñas) -->
+      <div class="sm:hidden flex flex-col gap-2 bg-gray-800 p-3 rounded-lg border border-gray-700">
+        <label class="text-sm text-gray-400">Seleccionar Alcance del Escáner:</label>
+        <select id="filtroAlcanceMovil" class="bg-gray-700 text-sm rounded px-3 py-2 text-white border border-gray-600 w-full">
+          <option value="zona">📍 Mi Zona (5km)</option>
+          <option value="departamento">🏢 Mi Departamento / Estado</option>
+          <option value="pais">🇧🇴 Mi País</option>
+          <option value="continente">🌎 Mi Continente</option>
+          <option value="mundo" selected>🌍 Todo el Mundo</option>
+        </select>
+      </div>
+
+      <!-- Sección del Mapa -->
+      <section class="bg-gray-800 rounded-xl shadow-lg border border-gray-700 overflow-hidden">
+        <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800">
+          <h2 id="tituloMapa" class="text-lg font-semibold text-white"><i class="fa-solid fa-satellite-dish text-cyan-400 mr-2"></i>Radar Global</h2>
+          <button id="btnLocalizar" class="bg-gray-700 hover:bg-gray-600 text-xs px-3 py-1.5 rounded-lg transition text-cyan-300 border border-gray-600">
+            <i class="fa-solid fa-location-crosshairs mr-1"></i> Mi Ubicación
+          </button>
+        </div>
+        <!-- El mapa ya no tendrá la marca de agua fea -->
+        <div id="map" class="w-full bg-[#111]"></div>
+        <div class="p-3 bg-gray-800 text-xs text-gray-400 flex justify-between">
+          <span><i class="fa-solid fa-circle text-red-500 mr-1"></i> Violación Confirmada</span>
+          <span><i class="fa-solid fa-circle text-yellow-500 mr-1"></i> Actividad Sospechosa</span>
+        </div>
+      </section>
+
+      <!-- Panel de Reporte Universal -->
+      <section class="bg-gray-800 rounded-xl p-5 shadow-lg border border-gray-700">
+        <h2 class="text-lg font-semibold mb-4 text-cyan-300"><i class="fa-solid fa-bullhorn mr-2"></i>Denunciar Actividad de Bots</h2>
+        <div class="grid md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Enlace / URL del incidente</label>
+            <input id="inputUrl" type="text" class="w-full bg-gray-900 rounded px-3 py-2 border border-gray-700 text-sm focus:border-cyan-500 focus:outline-none" placeholder="Ej: Link del video, post o grupo">
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Tipo de Infracción / Abuso</label>
+            <select id="inputTipo" class="w-full bg-gray-900 rounded px-3 py-2 border border-gray-700 text-sm focus:border-cyan-500 focus:outline-none">
+              <option>🤬 Odio, Racismo o Discriminación</option>
+              <option>💸 Estafas y Fraudes Financieros (Scam)</option>
+              <option>🎭 Desinformación / Noticias Falsas</option>
+              <option>👤 Acoso Cibernético / Doxing</option>
+              <option>📈 Manipulación de Votos o Tendencias</option>
+              <option>📩 Spam Masivo / Enlaces maliciosos</option>
+              <option>⚠️ Contenido Ilegal o Peligroso</option>
+              <option>🤖 Otro tipo de abuso coordinado</option>
+            </select>
+          </div>
+        </div>
+        
+        <!-- Simulación de reCAPTCHA -->
+        <div class="mt-4 bg-gray-900 border border-gray-700 rounded p-3 flex justify-between items-center w-full max-w-[300px]">
+          <div class="flex items-center gap-3">
+            <input type="checkbox" id="checkCaptcha" class="w-5 h-5 cursor-pointer accent-cyan-500">
+            <span class="text-sm text-gray-300">No soy un bot</span>
+          </div>
+          <div class="flex flex-col items-center">
+            <i class="fa-solid fa-recycle text-blue-500 text-xl"></i>
+            <span class="text-[10px] text-gray-500 mt-1">reCAPTCHA</span>
+          </div>
+        </div>
+
+        <button id="btnEnviarDenuncia" class="mt-4 w-full bg-gray-700 hover:bg-cyan-600 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition duration-200">
+          <i class="fa-solid fa-lock mr-2"></i> Inicia sesión para Denunciar
+        </button>
+      </section>
+    </div>
+
+    <!-- Columna Derecha: Feed de Alertas -->
+    <div class="space-y-4 h-[800px] flex flex-col">
+      <div class="flex justify-between items-center mb-2">
+        <h2 class="text-xl font-bold text-white"><i class="fa-solid fa-bell text-yellow-400 mr-2"></i>Alertas Detectadas</h2>
+        <span id="contadorAlertas" class="bg-red-500/20 text-red-400 text-xs px-2 py-1 rounded-full font-bold"></span>
+      </div>
+      
+      <div id="feedAlertas" class="flex-grow overflow-y-auto pr-2 space-y-3 pb-4 scrollbar-thin">
+        <!-- Las alertas se inyectarán dinámicamente -->
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Aviso Legal (Footer) -->
+  <footer class="bg-gray-800 border-t border-gray-700 text-center py-6 mt-8">
+    <div class="container mx-auto px-4 text-xs text-gray-500 max-w-4xl">
+      <p class="mb-2 uppercase font-bold tracking-wider text-gray-400">🛡️ Alerta Patrón - Plataforma de Inteligencia Colectiva</p>
+      <p>
+        <strong>Aviso Legal:</strong> Esta plataforma es un observatorio comunitario. Los reportes e incidentes mostrados en el mapa son generados por los usuarios ("Detectives Digitales") y <strong>no representan acusaciones oficiales ni comprobadas legalmente por los creadores de la aplicación</strong>. Cada usuario es responsable de la veracidad de la información que publica. Si crees que un reporte es falso, utiliza el sistema de votación para reducir su puntaje de confianza. 
+      </p>
+      <div class="mt-3 flex justify-center gap-4">
+        <a href="#" class="hover:text-cyan-400 transition">Términos de Servicio</a>
+        <a href="#" class="hover:text-cyan-400 transition">Política de Privacidad</a>
+        <a href="#" class="hover:text-cyan-400 transition">Protocolo Anti-DDoS</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Modal GUÍA EDUCATIVA -->
+  <div id="modalGuia" class="fixed inset-0 bg-black/80 z-[100] hidden flex justify-center items-center p-4">
+    <div class="bg-gray-800 rounded-xl border border-cyan-700 shadow-2xl shadow-cyan-900/20 max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      
+      <div class="p-4 border-b border-gray-700 bg-gray-900 flex justify-between items-center">
+        <h3 class="text-xl font-bold text-white"><i class="fa-solid fa-graduation-cap text-cyan-400 mr-2"></i>Aprende a Detectar Bots</h3>
+        <button onclick="cerrarGuia()" class="text-gray-400 hover:text-white transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      
+      <div class="p-6 overflow-y-auto space-y-6">
+        <p class="text-gray-300 text-sm">Cualquier persona puede ser un detective digital. Sigue estas 3 reglas de oro antes de creer en un mensaje extraño o enlace en redes sociales:</p>
+        
+        <!-- Regla 1 -->
+        <div class="flex gap-4 items-start bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+          <div class="bg-blue-900/50 p-3 rounded-full text-blue-400"><i class="fa-solid fa-user-secret text-2xl"></i></div>
+          <div>
+            <h4 class="font-bold text-white mb-1">1. Perfiles Fantasma</h4>
+            <p class="text-sm text-gray-400">Desconfía si el usuario no tiene foto de perfil (o usa fotos robadas de internet), fue creado hace muy pocos días, y su nombre de usuario tiene muchos números extraños (Ej: <em>@juanpablo983712</em>).</p>
+          </div>
+        </div>
+
+        <!-- Regla 2 -->
+        <div class="flex gap-4 items-start bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+          <div class="bg-yellow-900/50 p-3 rounded-full text-yellow-400"><i class="fa-solid fa-clone text-2xl"></i></div>
+          <div>
+            <h4 class="font-bold text-white mb-1">2. El Efecto Loro (Mensajes Idénticos)</h4>
+            <p class="text-sm text-gray-400">Si entras a los comentarios de una noticia o producto y ves que 5, 10 o 50 personas diferentes han escrito <strong>exactamente la misma frase</strong>, estás viendo una granja de bots en acción.</p>
+          </div>
+        </div>
+
+        <!-- Regla 3 -->
+        <div class="flex gap-4 items-start bg-gray-900/50 p-4 rounded-lg border border-gray-700">
+          <div class="bg-red-900/50 p-3 rounded-full text-red-400"><i class="fa-solid fa-hand-holding-dollar text-2xl"></i></div>
+          <div>
+            <h4 class="font-bold text-white mb-1">3. Dinero Fácil y Urgencia</h4>
+            <p class="text-sm text-gray-400">Los estafadores usan bots para crear un sentido falso de urgencia o premios increíbles (Ej: <em>"Gana $500 ahora mismo dando clic aquí, cupos limitados"</em>). Nunca des clic ni transfieras dinero anticipado.</p>
+          </div>
+        </div>
+      </div>
+      
+      <div class="p-4 border-t border-gray-700 bg-gray-900 text-center">
+        <button onclick="cerrarGuia()" class="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-2 rounded-lg font-bold transition w-full sm:w-auto">¡Entendido! Estoy listo para reportar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Evidencia (Oculto por defecto) -->
+  <div id="modalEvidencia" class="fixed inset-0 bg-black/80 z-[100] hidden flex justify-center items-center p-4">
+    <div class="bg-gray-800 rounded-xl border border-gray-700 shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+      <!-- Cabecera -->
+      <div class="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-900">
+        <h3 id="modalTitulo" class="text-lg font-bold text-white"><i class="fa-solid fa-magnifying-glass text-cyan-400 mr-2"></i>Evidencia del Ataque</h3>
+        <button onclick="cerrarModal()" class="text-gray-400 hover:text-white transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+      </div>
+      
+      <!-- Cuerpo -->
+      <div class="p-5 overflow-y-auto space-y-4">
+        <p id="modalDesc" class="text-sm text-gray-300"></p>
+        
+        <div class="bg-gray-900 rounded-lg p-4 border border-gray-700">
+          <h4 class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Mensaje Repetido por Bots</h4>
+          <p id="modalMensaje" class="text-sm text-white italic border-l-4 border-cyan-500 pl-3 py-1"></p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-gray-900 rounded-lg p-4 border border-gray-700">
+            <h4 class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Perfil Atacado</h4>
+            <a id="modalPerfil" href="#" target="_blank" class="text-cyan-400 text-sm hover:underline"><i class="fa-solid fa-link mr-1"></i>Ver Perfil Real</a>
+          </div>
+          <div class="bg-gray-900 rounded-lg p-4 border border-gray-700">
+            <h4 class="text-xs text-gray-500 font-bold uppercase tracking-wider mb-2">Ejemplo de Cuentas Falsas</h4>
+            <ul id="modalCuentas" class="text-xs text-red-400 space-y-1"></ul>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Pie -->
+      <div class="p-4 border-t border-gray-700 bg-gray-900 flex justify-end gap-3">
+        <button onclick="cerrarModal()" class="px-4 py-2 text-sm text-gray-400 hover:text-white transition">Cerrar</button>
+        <button class="px-4 py-2 bg-red-900/50 hover:bg-red-500 text-red-300 hover:text-white text-sm rounded transition border border-red-500/30">
+          <i class="fa-solid fa-ban mr-1"></i> Reportar a la Plataforma
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="logica.js"></script>
+</body>
+</html>
